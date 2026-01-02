@@ -16,6 +16,10 @@ export * from './data/constants';
 export * from './utils/wuxing-utils';
 export * from './utils/date-utils';
 
+// 导入用于快捷函数
+import { baziCalculator } from './bazi/bazi-calculator';
+import type { BaziInput, BaziResult } from './types';
+
 /**
  * 快捷函数：计算八字排盘
  * @example
@@ -31,7 +35,7 @@ export * from './utils/date-utils';
  * console.log(result.pillars);
  * ```
  */
-export function calculate(input: import('./types').BaziInput): import('./types').BaziResult {
+export function calculate(input: BaziInput): BaziResult {
   return baziCalculator.calculate(input);
 }
 

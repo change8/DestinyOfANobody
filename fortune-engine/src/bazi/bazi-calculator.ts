@@ -20,10 +20,9 @@ import type {
 import {
   parseDate,
   parseTime,
-  combineDateAndTime,
   formatDate,
-  formatTime,
-  validateDateRange
+  validateDateRange,
+  combineDateAndTime
 } from '../utils/date-utils';
 import { calculateShiShen } from '../utils/wuxing-utils';
 import { pillarCalculator } from './pillar-calculator';
@@ -32,8 +31,6 @@ import {
   CANGGAN,
   GAN_WUXING,
   ZHI_WUXING,
-  TIANGAN,
-  DIZHI,
   SIXTY_JIAZI,
   LUNAR_MONTH_NAMES,
   LUNAR_DAY_NAMES
@@ -61,7 +58,7 @@ export class BaziCalculator {
     const options: Required<BaziOptions> = {
       timezone: input.options?.timezone ?? 8,
       useTrueSolarTime: input.options?.useTrueSolarTime ?? false,
-      longitude: input.options?.longitude,
+      longitude: input.options?.longitude ?? 120, // 默认东经120度（中国标准）
       ziShiMethod: input.options?.ziShiMethod ?? 'traditional'
     };
 
@@ -283,14 +280,14 @@ export class BaziCalculator {
   /**
    * 计算大运（简化版）
    */
-  private calculateDayun(pillars: Pillars, birthDate: Date, gender: string): Dayun[] {
+  private calculateDayun(pillars: Pillars, _birthDate: Date, gender: string): Dayun[] {
     const dayunList: Dayun[] = [];
 
     // 判断顺逆（简化版）
     const yangGan = ['甲', '丙', '戊', '庚', '壬'].includes(pillars.year.gan);
     const isShun = (gender === 'male' && yangGan) || (gender === 'female' && !yangGan);
 
-    // 起运年龄（简化为3岁）
+    // 起运年龄（简化为3岁，TODO: 使用birthDate精确计算）
     const startAge = 3;
 
     // 排8步大运
@@ -319,9 +316,10 @@ export class BaziCalculator {
   /**
    * 计算流年（简化版）
    */
-  private calculateLiunian(birthYear: number): Liunian[] {
+  private calculateLiunian(_birthYear: number): Liunian[] {
     const currentYear = new Date().getFullYear();
     const liunianList: Liunian[] = [];
+    // TODO: 可以基于birthYear计算从出生到现在的所有流年
 
     // 计算近10年
     for (let i = 0; i < 10; i++) {

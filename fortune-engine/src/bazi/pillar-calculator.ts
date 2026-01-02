@@ -12,8 +12,6 @@ import {
   HOUR_GAN_START
 } from '../data/constants';
 import {
-  parseTime,
-  combineDateAndTime,
   convertToTrueSolarTime,
   getDaysDifference
 } from '../utils/date-utils';
@@ -122,7 +120,7 @@ export class PillarCalculator {
     options: BaziOptions = {}
   ): { pillar: Pillar; isNextDay: boolean } {
     const hour = birthTime.getHours();
-    const minute = birthTime.getMinutes();
+    // const minute = birthTime.getMinutes(); // TODO: 可用于更精确的时辰划分
 
     // 确定时支和是否算第二天
     let zhiIndex: number;
