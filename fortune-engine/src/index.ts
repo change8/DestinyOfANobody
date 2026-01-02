@@ -16,6 +16,9 @@ export * from './data/constants';
 export * from './utils/wuxing-utils';
 export * from './utils/date-utils';
 
+// 导出梅花易数模块
+export * as meihua from './meihua';
+
 // 导入用于快捷函数
 import { baziCalculator } from './bazi/bazi-calculator';
 import type { BaziInput, BaziResult } from './types';
