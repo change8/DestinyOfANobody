@@ -25,15 +25,15 @@ import {
   combineDateAndTime
 } from '../utils/date-utils';
 import { calculateShiShen } from '../utils/wuxing-utils';
+import { solarToLunar } from '../utils/lunar-converter';
+import { getLichunTime as getSolarTermLichun } from '../data/solar-terms';
 import { pillarCalculator } from './pillar-calculator';
 import {
   NAYIN,
   CANGGAN,
   GAN_WUXING,
   ZHI_WUXING,
-  SIXTY_JIAZI,
-  LUNAR_MONTH_NAMES,
-  LUNAR_DAY_NAMES
+  SIXTY_JIAZI
 } from '../data/constants';
 
 /**
@@ -339,36 +339,48 @@ export class BaziCalculator {
   }
 
   /**
-   * 计算农历（简化版）
+   * 计算农历
    */
   private calculateLunar(date: Date) {
-    // 简化版，实际应该使用完整的农历算法
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+    try {
+      const lunarDate = solarToLunar(date);
+      return {
+        year: lunarDate.year,
+        month: lunarDate.month,
+        day: lunarDate.day,
+        leapMonth: lunarDate.isLeapMonth,
+        yearName: lunarDate.yearName,
+        monthName: lunarDate.monthName,
+        dayName: lunarDate.dayName
+      };
+    } catch (error) {
+      // 如果农历转换失败（可能超出范围），返回简化的近似值
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
 
-    // 获取年份干支
-    const yearIndex = (year - 4) % 60;
-    const jiazi = SIXTY_JIAZI[yearIndex < 0 ? yearIndex + 60 : yearIndex];
-
-    return {
-      year,
-      month,
-      day,
-      leapMonth: false,
-      yearName: `${jiazi.gan}${jiazi.zhi}年`,
-      monthName: LUNAR_MONTH_NAMES[month - 1] || '未知',
-      dayName: LUNAR_DAY_NAMES[day - 1] || '未知'
-    };
+      return {
+        year,
+        month,
+        day,
+        leapMonth: false,
+        yearName: `${year}年`,
+        monthName: `${month}月`,
+        dayName: `${day}日`
+      };
+    }
   }
 
   /**
-   * 获取立春时间（简化版）
+   * 获取立春时间
    */
   private getLichunTime(year: number): Date {
-    // 简化版：立春一般在2月3-5日
-    // 实际应该使用完整的节气表
-    return new Date(year, 1, 4, 0, 0, 0);
+    try {
+      return getSolarTermLichun(year);
+    } catch (error) {
+      // 如果获取失败，返回近似值（2月4日）
+      return new Date(year, 1, 4, 0, 0, 0);
+    }
   }
 }
 

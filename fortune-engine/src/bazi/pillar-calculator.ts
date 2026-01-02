@@ -15,6 +15,7 @@ import {
   convertToTrueSolarTime,
   getDaysDifference
 } from '../utils/date-utils';
+import { getCurrentSolarTerm, SolarTermIndex, SOLAR_TERM_TO_MONTH_ZHI } from '../data/solar-terms';
 
 /**
  * 四柱计算器类
@@ -158,30 +159,59 @@ export class PillarCalculator {
 
   /**
    * 根据节气确定月支
-   * 注意：这里需要完整的节气数据，目前为简化版
    */
   private getMonthZhiByJieqi(date: Date): Dizhi {
-    // 简化版：根据公历月份近似
-    // 实际应该根据精确的节气时间判断
-    const month = date.getMonth() + 1; // 1-12
+    try {
+      // 获取当前最近的已过节气
+      const currentTerm = getCurrentSolarTerm(date);
 
-    // 这是一个简化映射，实际应该查询节气表
-    const monthZhiMap: Record<number, Dizhi> = {
-      1: '丑', // 小寒到立春
-      2: '寅', // 立春到惊蛰
-      3: '卯', // 惊蛰到清明
-      4: '辰', // 清明到立夏
-      5: '巳', // 立夏到芒种
-      6: '午', // 芒种到小暑
-      7: '未', // 小暑到立秋
-      8: '申', // 立秋到白露
-      9: '酉', // 白露到寒露
-      10: '戌', // 寒露到立冬
-      11: '亥', // 立冬到大雪
-      12: '子' // 大雪到小寒
-    };
+      // 根据节气确定月支
+      // 月柱的界定以节气为准：立春、惊蛰、清明、立夏、芒种、小暑、立秋、白露、寒露、立冬、大雪、小寒
+      const monthDefiningTerms = [
+        SolarTermIndex.小寒,   // 丑月 (十二月)
+        SolarTermIndex.立春,   // 寅月 (正月)
+        SolarTermIndex.惊蛰,   // 卯月 (二月)
+        SolarTermIndex.清明,   // 辰月 (三月)
+        SolarTermIndex.立夏,   // 巳月 (四月)
+        SolarTermIndex.芒种,   // 午月 (五月)
+        SolarTermIndex.小暑,   // 未月 (六月)
+        SolarTermIndex.立秋,   // 申月 (七月)
+        SolarTermIndex.白露,   // 酉月 (八月)
+        SolarTermIndex.寒露,   // 戌月 (九月)
+        SolarTermIndex.立冬,   // 亥月 (十月)
+        SolarTermIndex.大雪    // 子月 (十一月)
+      ];
 
-    return monthZhiMap[month];
+      // 找到当前处于哪个节气之后
+      let termIndex = currentTerm.index;
+
+      // 如果是中气（非节气），需要往前找到对应的节气
+      // 节气是奇数索引（0=小寒, 2=立春, 4=惊蛰...）
+      while (!monthDefiningTerms.includes(termIndex)) {
+        termIndex--;
+        if (termIndex < 0) {
+          termIndex = SolarTermIndex.大雪; // 回到上一年的大雪
+          break;
+        }
+      }
+
+      // 从 SOLAR_TERM_TO_MONTH_ZHI 获取对应的月支
+      const zhi = SOLAR_TERM_TO_MONTH_ZHI[termIndex];
+      if (zhi) {
+        return zhi as Dizhi;
+      }
+
+      // 如果没有找到，使用简化方法
+      throw new Error('无法确定月支');
+    } catch (error) {
+      // 降级处理：使用简化的公历月份映射
+      const month = date.getMonth() + 1;
+      const monthZhiMap: Record<number, Dizhi> = {
+        1: '丑', 2: '寅', 3: '卯', 4: '辰', 5: '巳', 6: '午',
+        7: '未', 8: '申', 9: '酉', 10: '戌', 11: '亥', 12: '子'
+      };
+      return monthZhiMap[month];
+    }
   }
 
   /**
