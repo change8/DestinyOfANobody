@@ -4,6 +4,8 @@
 
 import { BA_GUA_BY_INDEX, type BaGua } from './bagua-data';
 import { getGuaName } from './liushisi-gua';
+import type { CharAnalysisResult } from './char-analysis';
+import { analyzeCharacter } from './char-analysis';
 
 /**
  * 卦象结果
@@ -30,7 +32,11 @@ export interface GuaResult {
     upperNumber: number;
     lowerNumber: number;
     totalNumber: number;
+    character?: string;     // 如果是字占，记录原始字符
   };
+
+  // 字义分析（仅字占时有）
+  charAnalysis?: CharAnalysisResult;
 }
 
 /**
@@ -121,22 +127,32 @@ export function qiguaByNumber(num1: number, num2?: number, num3?: number): GuaRe
 }
 
 /**
- * 汉字起卦
+ * 汉字起卦（增强版，包含字义分析）
  * @param char 汉字
  * @param strokeCount 笔画数（如果不提供，会尝试计算）
  */
 export function qiguaByChar(char: string, strokeCount?: number): GuaResult {
-  // 如果没有提供笔画数，使用字符的Unicode编码作为替代
-  const strokes = strokeCount || getStrokeCount(char);
+  // 获取准确笔画数
+  const strokes = strokeCount || getAccurateStrokeCount(char);
+
+  // 进行字义分析
+  const charAnalysis = analyzeCharacter(char, strokes);
 
   // 使用笔画数起卦
   const upperNumber = strokes;
   const lowerNumber = strokes;
   const totalNumber = strokes * 2;
 
+  const basicGua = qiguaByNumber(upperNumber, lowerNumber, totalNumber);
+
   return {
-    ...qiguaByNumber(upperNumber, lowerNumber, totalNumber),
-    method: `字占起卦（${char}字，${strokes}画）`
+    ...basicGua,
+    method: `字占起卦（${char}字，${strokes}画）`,
+    rawData: {
+      ...basicGua.rawData,
+      character: char
+    },
+    charAnalysis
   };
 }
 

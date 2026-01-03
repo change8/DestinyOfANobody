@@ -9,7 +9,6 @@
  */
 
 import type { BaGua } from './bagua-data';
-import { BA_GUA_DATA } from './bagua-data';
 
 /**
  * 字的结构类型

@@ -68,7 +68,7 @@ export interface TiYongAnalysis {
  * 获取八卦的五行属性
  */
 export function getGuaWuxing(gua: BaGua): Wuxing {
-  return BA_GUA_DATA[gua].nature;
+  return BA_GUA_DATA[gua].nature as Wuxing;
 }
 
 /**
@@ -242,15 +242,15 @@ export function analyzeTiYong(guaResult: GuaResult): TiYongAnalysis {
   return {
     体卦: {
       卦名: 体卦,
-      五行: tiWuxing,
-      卦数: tiData.number,
-      象征: tiData.象征
+      五行: tiWuxing as Wuxing,
+      卦数: tiData.index,
+      象征: `${体卦}卦，${tiData.yinyang}性，${tiWuxing}行`
     },
     用卦: {
       卦名: 用卦,
-      五行: yongWuxing,
-      卦数: yongData.number,
-      象征: yongData.象征
+      五行: yongWuxing as Wuxing,
+      卦数: yongData.index,
+      象征: `${用卦}卦，${yongData.yinyang}性，${yongWuxing}行`
     },
     体用关系: tiYongRelation,
     生克分析: {

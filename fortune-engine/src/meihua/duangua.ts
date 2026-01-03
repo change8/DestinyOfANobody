@@ -1,12 +1,14 @@
 /**
- * 梅花易数 - 断卦模块
+ * 梅花易数 - 断卦模块（增强版）
  */
 
 import { BA_GUA_XIANG, BA_GUA_DATA, type BaGua } from './bagua-data';
 import type { GuaResult } from './qigua';
+import { analyzeTiYong, type TiYongAnalysis } from './tigua-yonggua';
+import { calculateHugua, type HuguaResult } from './hugua';
 
 /**
- * 失物占结果
+ * 失物占结果（增强版）
  */
 export interface LostItemResult {
   // 问题信息
@@ -21,6 +23,15 @@ export interface LostItemResult {
     changingLine: number;
     changeGua: string;
   };
+
+  // 体用分析（新增）
+  体用分析?: TiYongAnalysis;
+
+  // 互卦分析（新增）
+  互卦分析?: HuguaResult;
+
+  // 字义分析（如果是字占）
+  字义分析?: string;
 
   // 物品特征推断
   itemFeatures: {
@@ -53,19 +64,27 @@ export interface LostItemResult {
     上卦分析: string;
     下卦分析: string;
     动爻分析: string;
+    体用判断?: string;  // 新增
+    互卦过程?: string;  // 新增
     综合判断: string;
   };
 }
 
 /**
- * 失物占
+ * 失物占（增强版，整合体用、互卦分析）
  */
 export function divineForLostItem(
   guaResult: GuaResult,
   question: string,
   itemName?: string
 ): LostItemResult {
-  const { upperGua, lowerGua, changingLine, mainGuaName, changeGua } = guaResult;
+  const { upperGua, lowerGua, changingLine, mainGuaName, changeGua, charAnalysis } = guaResult;
+
+  // ===== 核心分析：体用论 =====
+  const tiYongAnalysis = analyzeTiYong(guaResult);
+
+  // ===== 核心分析：互卦 =====
+  const huguaAnalysis = calculateHugua(upperGua, lowerGua);
 
   // 获取八卦类象
   const upperXiang = BA_GUA_XIANG[upperGua];
@@ -74,14 +93,27 @@ export function divineForLostItem(
   // 分析物品特征
   const itemFeatures = analyzeItemFeatures(upperXiang, lowerXiang);
 
-  // 分析位置
-  const location = analyzeLocation(upperXiang, lowerXiang, changingLine);
+  // 分析位置（结合体卦和用卦）
+  const location = analyzeLocation(upperXiang, lowerXiang, changingLine, tiYongAnalysis);
 
-  // 分析时间和吉凶
-  const timing = analyzeTiming(upperGua, lowerGua, changingLine);
+  // 分析时间和吉凶（优先使用体用分析的结果）
+  const timing = analyzeTiming(upperGua, lowerGua, changingLine, tiYongAnalysis);
 
-  // 详细分析
-  const analysis = generateAnalysis(upperXiang, lowerXiang, changingLine, mainGuaName);
+  // 详细分析（整合所有分析）
+  const analysis = generateAnalysis(
+    upperXiang,
+    lowerXiang,
+    changingLine,
+    mainGuaName,
+    tiYongAnalysis,
+    huguaAnalysis
+  );
+
+  // 字义分析（如果是字占）
+  let charAnalysisText: string | undefined;
+  if (charAnalysis) {
+    charAnalysisText = `${charAnalysis.分析说明}\n建议卦象：${charAnalysis.建议卦象.join('、')}`;
+  }
 
   return {
     question,
@@ -93,6 +125,9 @@ export function divineForLostItem(
       changingLine,
       changeGua: changeGua?.guaName || ''
     },
+    体用分析: tiYongAnalysis,
+    互卦分析: huguaAnalysis,
+    字义分析: charAnalysisText,
     itemFeatures,
     location,
     timing,
@@ -116,10 +151,27 @@ function analyzeItemFeatures(upperXiang: any, lowerXiang: any) {
 /**
  * 分析位置
  */
-function analyzeLocation(upperXiang: any, lowerXiang: any, changingLine: number) {
-  // 方位主要看下卦（内卦为体，代表求测者和物品本身）
-  const primaryDirection = lowerXiang.方位;
-  const secondaryDirection = upperXiang.方位;
+function analyzeLocation(
+  upperXiang: any,
+  lowerXiang: any,
+  changingLine: number,
+  tiYongAnalysis?: TiYongAnalysis
+) {
+  // 方位主要看体卦（如果有体用分析）
+  let primaryDirection: string;
+  let secondaryDirection: string;
+
+  if (tiYongAnalysis) {
+    // 使用体用分析确定主次方位
+    const tiGuaXiang = BA_GUA_XIANG[tiYongAnalysis.体卦.卦名];
+    const yongGuaXiang = BA_GUA_XIANG[tiYongAnalysis.用卦.卦名];
+    primaryDirection = tiGuaXiang.方位;
+    secondaryDirection = yongGuaXiang.方位;
+  } else {
+    // 传统方法：下卦为主，上卦为次
+    primaryDirection = lowerXiang.方位;
+    secondaryDirection = upperXiang.方位;
+  }
 
   // 高低位置综合判断
   const heightPosition = combinePositions(upperXiang.位置.高低, lowerXiang.位置.高低, changingLine);
@@ -145,6 +197,20 @@ function analyzeLocation(upperXiang: any, lowerXiang: any, changingLine: number)
 /**
  * 组合位置判断
  */
+/**
+ * 根据五行推断时间
+ */
+function getTimingByWuxing(wuxing: string): string {
+  const timingMap: Record<string, string> = {
+    '木': '春季或寅卯日',
+    '火': '夏季或巳午日',
+    '土': '四季月或辰戌丑未日',
+    '金': '秋季或申酉日',
+    '水': '冬季或亥子日'
+  };
+  return timingMap[wuxing] || '近期';
+}
+
 function combinePositions(upper: string, lower: string, changingLine: number): string {
   if (changingLine <= 3) {
     return lower;  // 动爻在下卦，以下卦为主
@@ -175,11 +241,26 @@ function analyzeDistance(upperXiang: any, lowerXiang: any): string {
 /**
  * 分析时间和吉凶
  */
-function analyzeTiming(upperGua: BaGua, lowerGua: BaGua, changingLine: number) {
+function analyzeTiming(
+  upperGua: BaGua,
+  lowerGua: BaGua,
+  changingLine: number,
+  tiYongAnalysis?: TiYongAnalysis
+) {
   const upperData = BA_GUA_DATA[upperGua];
   const lowerData = BA_GUA_DATA[lowerGua];
 
-  // 判断能否找到
+  // 优先使用体用分析的失物判断
+  if (tiYongAnalysis?.失物判断) {
+    return {
+      能否找到: tiYongAnalysis.失物判断.能否找到,
+      预计时间: getTimingByWuxing(tiYongAnalysis.用卦.五行),
+      吉凶: tiYongAnalysis.生克分析.吉凶,
+      建议: tiYongAnalysis.失物判断.寻找建议
+    };
+  }
+
+  // 传统方法：判断能否找到
   let canFind = true;
   let timing = '近期';
   let jiXiong = '吉';
@@ -271,7 +352,9 @@ function generateAnalysis(
   upperXiang: any,
   lowerXiang: any,
   changingLine: number,
-  mainGuaName: string
+  mainGuaName: string,
+  tiYongAnalysis?: TiYongAnalysis,
+  huguaAnalysis?: HuguaResult
 ) {
   const upperAnalysis = `上卦为${upperXiang.gua}（${upperXiang.卦符}），五行属${upperXiang.五行}，` +
     `代表${upperXiang.方位}方位，物象为${upperXiang.物象.特征.slice(0, 3).join('、')}，` +
@@ -285,18 +368,48 @@ function generateAnalysis(
   const yaoInGua = changingLine <= 3 ? '下卦' : '上卦';
   const yaoAnalysis = `动爻在${yaoPosition}（${yaoInGua}），表示变化的焦点在${yaoInGua}所代表的方面。`;
 
-  const comprehensive = `得卦${mainGuaName}，综合判断：\n` +
-    `物品方位应在${lowerXiang.方位}（主要）或${upperXiang.方位}（次要）方向，` +
-    `位置${upperXiang.位置.高低}或${lowerXiang.位置.高低}，` +
-    `建议在${lowerXiang.位置.具体[0]}、${upperXiang.位置.具体[0]}等地方寻找。\n` +
-    `物品特征：${upperXiang.物象.颜色[0]}或${lowerXiang.物象.颜色[0]}色，` +
-    `${upperXiang.物象.形状[0]}或${lowerXiang.物象.形状[0]}，` +
-    `材质为${upperXiang.物象.质地[0]}或${lowerXiang.物象.质地[0]}。`;
+  // 体用分析文本
+  let tiYongText: string | undefined;
+  if (tiYongAnalysis) {
+    tiYongText = `\n【体用分析】\n` +
+      `体卦${tiYongAnalysis.体卦.卦名}，用卦${tiYongAnalysis.用卦.卦名}，${tiYongAnalysis.体用关系}。\n` +
+      `${tiYongAnalysis.生克分析.关系描述}，${tiYongAnalysis.生克分析.强弱判断}。\n` +
+      `失物判断：${tiYongAnalysis.失物判断?.寻找建议}`;
+  }
+
+  // 互卦分析文本
+  let huguaText: string | undefined;
+  if (huguaAnalysis) {
+    huguaText = `\n【互卦】${huguaAnalysis.互卦名}\n` +
+      `${huguaAnalysis.互卦含义.整体含义}`;
+  }
+
+  let comprehensive = `得卦${mainGuaName}，综合判断：\n`;
+
+  if (tiYongAnalysis) {
+    const tiGuaXiang = BA_GUA_XIANG[tiYongAnalysis.体卦.卦名];
+    const yongGuaXiang = BA_GUA_XIANG[tiYongAnalysis.用卦.卦名];
+    comprehensive += `物品方位应在${tiGuaXiang.方位}（主要）或${yongGuaXiang.方位}（次要）方向，` +
+      `位置${tiGuaXiang.位置.高低}或${yongGuaXiang.位置.高低}，` +
+      `建议在${tiGuaXiang.位置.具体[0]}、${yongGuaXiang.位置.具体[0]}等地方寻找。\n` +
+      `物品特征：${tiGuaXiang.物象.颜色[0]}或${yongGuaXiang.物象.颜色[0]}色，` +
+      `${tiGuaXiang.物象.形状[0]}或${yongGuaXiang.物象.形状[0]}，` +
+      `材质为${tiGuaXiang.物象.质地[0]}或${yongGuaXiang.物象.质地[0]}。`;
+  } else {
+    comprehensive += `物品方位应在${lowerXiang.方位}（主要）或${upperXiang.方位}（次要）方向，` +
+      `位置${upperXiang.位置.高低}或${lowerXiang.位置.高低}，` +
+      `建议在${lowerXiang.位置.具体[0]}、${upperXiang.位置.具体[0]}等地方寻找。\n` +
+      `物品特征：${upperXiang.物象.颜色[0]}或${lowerXiang.物象.颜色[0]}色，` +
+      `${upperXiang.物象.形状[0]}或${lowerXiang.物象.形状[0]}，` +
+      `材质为${upperXiang.物象.质地[0]}或${lowerXiang.物象.质地[0]}。`;
+  }
 
   return {
     上卦分析: upperAnalysis,
     下卦分析: lowerAnalysis,
     动爻分析: yaoAnalysis,
+    体用判断: tiYongText,
+    互卦过程: huguaText,
     综合判断: comprehensive
   };
 }

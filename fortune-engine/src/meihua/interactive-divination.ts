@@ -15,7 +15,7 @@ import type { TiYongAnalysis } from './tigua-yonggua';
 import type { HuguaResult } from './hugua';
 import { analyzeTiYong } from './tigua-yonggua';
 import { calculateHugua } from './hugua';
-import { analyzeCharacter, CHAR_SEMANTICS } from './char-analysis';
+import { analyzeCharacter } from './char-analysis';
 import { BA_GUA_XIANG } from './bagua-data';
 
 /**
@@ -239,8 +239,9 @@ export function getNextStep(session: DivinationSession): NextStepSuggestion {
       };
 
     case 'features':
+      const difficultyText = tiYongAnalysis?.失物判断?.难易程度 || '一定时间';
       return {
-        question: `根据体用生克关系，预计${tiYongAnalysis?.失物判断?.预计时间}能找到。您是否愿意按照卦象指示的方位和位置再仔细寻找一次？`,
+        question: `根据体用生克关系，难度为${difficultyText}。您是否愿意按照卦象指示的方位和位置再仔细寻找一次？`,
         questionType: 'yes_no',
         explanation: `${tiYongAnalysis?.失物判断?.寻找建议}`,
         alternatives: [
@@ -310,7 +311,7 @@ export function processFeedback(
 
   // 处理额外信息
   if (feedback.额外信息) {
-    const { 再起一字, 再起一数, 观察方位, 看到颜色, 听到声音 } = feedback.额外信息;
+    const { 再起一字, 再起一数: _再起一数, 观察方位, 看到颜色, 听到声音 } = feedback.额外信息;
 
     if (再起一字) {
       // 分析新字的含义
@@ -361,7 +362,7 @@ export function processFeedback(
 /**
  * 分析外应
  */
-function analyzeExternalSigns(signs: string[], gua: GuaResult): string {
+function analyzeExternalSigns(signs: string[], _gua: GuaResult): string {
   let analysis = '';
 
   for (const sign of signs) {
@@ -383,7 +384,7 @@ function analyzeExternalSigns(signs: string[], gua: GuaResult): string {
 /**
  * 分析颜色线索
  */
-function analyzeColorClues(colors: string[], session: DivinationSession): string {
+function analyzeColorClues(colors: string[], _session: DivinationSession): string {
   const colorToGua: Record<string, BaGua> = {
     '红': '离',
     '黄': '坤',

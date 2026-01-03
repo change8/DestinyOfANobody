@@ -102,12 +102,15 @@ export function calculateHugua(upperGua: BaGua, lowerGua: BaGua): HuguaResult {
   const upperHuData = BA_GUA_DATA[upperHugua];
   const lowerHuData = BA_GUA_DATA[lowerHugua];
 
+  const upperSymbol = `${upperHuData.yinyang}性${upperHuData.nature}行`;
+  const lowerSymbol = `${lowerHuData.yinyang}性${lowerHuData.nature}行`;
+
   let overallMeaning = `互卦${huguaName}，代表事物发展的中间过程。`;
 
   if (upperHugua === lowerHugua) {
-    overallMeaning += `上下互卦皆为${upperHugua}，表示过程中${upperHuData.象征}的特质持续显现。`;
+    overallMeaning += `上下互卦皆为${upperHugua}，表示过程中${upperSymbol}的特质持续显现。`;
   } else {
-    overallMeaning += `从${lowerHugua}（${lowerHuData.象征}）渐变到${upperHugua}（${upperHuData.象征}），体现了从内到外的转变过程。`;
+    overallMeaning += `从${lowerHugua}（${lowerSymbol}）渐变到${upperHugua}（${upperSymbol}），体现了从内到外的转变过程。`;
   }
 
   return {
@@ -115,8 +118,8 @@ export function calculateHugua(upperGua: BaGua, lowerGua: BaGua): HuguaResult {
     下互卦: lowerHugua,
     互卦名: huguaName,
     互卦含义: {
-      上互象征: `${upperHugua}卦，象征${upperHuData.象征}`,
-      下互象征: `${lowerHugua}卦，象征${lowerHuData.象征}`,
+      上互象征: `${upperHugua}卦，${upperSymbol}`,
+      下互象征: `${lowerHugua}卦，${lowerSymbol}`,
       整体含义: overallMeaning
     }
   };
