@@ -79,6 +79,18 @@ export {
   generateFinalReport
 } from './interactive-divination';
 
+// 导出扩展起卦方法
+export {
+  type PinyinTone,
+  type Direction,
+  type ObjectInfo,
+  qiguaByTone,
+  qiguaByStructure,
+  qiguaByRadical,
+  qiguaByDirection,
+  qiguaByEnvironment
+} from './qigua-extended';
+
 /**
  * 梅花易数快捷使用示例：
  *
