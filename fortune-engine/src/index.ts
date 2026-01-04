@@ -19,6 +19,9 @@ export * from './utils/date-utils';
 // 导出梅花易数模块
 export * as meihua from './meihua';
 
+// 导出 LLM 集成模块（可选）
+export * as llm from './llm';
+
 // 导入用于快捷函数
 import { baziCalculator } from './bazi/bazi-calculator';
 import type { BaziInput, BaziResult } from './types';
