@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fortune Engine - 完整 LLM 集成演示</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Microsoft YaHei', 'SF Pro Display', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+      animation: fadeIn 0.8s ease-in;
+    }
+    .header h1 {
+      font-size: 2.8em;
+      margin-bottom: 10px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .header p { font-size: 1.2em; opacity: 0.95; }
+    .badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 0.9em;
+      margin: 10px 5px 0;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 35px;
+      margin-bottom: 20px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+      animation: slideUp 0.6s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .input-area { margin-bottom: 25px; }
+    .input-area label {
+      display: block;
+      margin-bottom: 10px;
+      color: #333;
+      font-weight: 600;
+      font-size: 1.1em;
+    }
+    .input-area textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      font-size: 16px;
+      font-family: inherit;
+      resize: vertical;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    .input-area textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .hint {
+      margin-top: 8px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    .options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+    .option-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #555;
+      font-weight: 600;
+      font-size: 0.95em;
+    }
+    .option-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 15px;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.3s;
+    }
+    .option-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 16px 45px;
+      font-size: 18px;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .processing {
+      display: none;
+      text-align: center;
+      padding: 40px;
+      color: #667eea;
+    }
+    .processing.show { display: block; }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .stage {
+      margin: 15px 0;
+      padding: 12px;
+      background: #f5f7fa;
+      border-radius: 8px;
+      font-size: 0.95em;
+    }
+    .stage.active {
+      background: #e3f2fd;
+      color: #1976d2;
+      font-weight: 600;
+    }
+    .stage.completed {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .stage::before { content: '⏳ '; }
+    .stage.active::before { content: '▶️ '; }
+    .stage.completed::before { content: '✅ '; }
+    .result {
+      display: none;
+    }
+    .result.show {
+      display: block;
+      animation: slideUp 0.6s ease-out;
+    }
+    .result h2 {
+      color: #333;
+      margin-bottom: 20px;
+      font-size: 1.8em;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #667eea;
+    }
+    .summary-box {
+      background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+      padding: 25px;
+      border-radius: 15px;
+      margin-bottom: 30px;
+      border-left: 5px solid #667eea;
+    }
+    .summary-box h3 {
+      color: #667eea;
+      margin-bottom: 12px;
+      font-size: 1.3em;
+    }
+    .summary-box p {
+      color: #333;
+      line-height: 1.8;
+      font-size: 1.05em;
+    }
+    .section {
+      background: #f8f9fa;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border-left: 4px solid #667eea;
+    }
+    .section h3 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 1.3em;
+    }
+    .section p {
+      color: #555;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+    .error {
+      display: none;
+      background: #ffebee;
+      color: #c62828;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border-left: 5px solid #c62828;
+    }
+    .error.show { display: block; }
+    @media (max-width: 768px) {
+      .header h1 { font-size: 2em; }
+      .card { padding: 25px; }
+      .options { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔮 Fortune Engine</h1>
+      <p>传统命理 + AI 大模型完整解决方案</p>
+      <div>
+        <span class="badge">✨ 自然语言输入</span>
+        <span class="badge">🧮 确定性计算</span>
+        <span class="badge">💬 AI 智能解读</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="input-area">
+        <label for="userInput">📝 请输入您的问题</label>
+        <textarea id="userInput" placeholder="例如：&#10;- 我是1990年1月15日早上8点出生的男性，帮我算算八字&#10;- 我的钥匙丢了，在哪里能找到？用"找"字起卦">我是1990年1月15日早上8点出生的男性，帮我算算八字</textarea>
+        <div class="hint">💡 支持自然语言输入，AI 会自动理解您的需求并提取关键信息</div>
+      </div>
+
+      <div class="options">
+        <div class="option-group">
+          <label>LLM 提供商</label>
+          <select id="llmProvider">
+            <option value="openai">OpenAI (GPT-4)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="zhipu" selected>智谱AI (GLM-4)</option>
+            <option value="qwen">通义千问 (Qwen)</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div class="option-group">
+          <label>解读风格</label>
+          <select id="interpretStyle">
+            <option value="professional" selected>专业</option>
+            <option value="casual">轻松</option>
+            <option value="detailed">详细</option>
+            <option value="concise">简洁</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn" onclick="analyze()">🚀 开始分析</button>
+    </div>
+
+    <div id="error" class="card error"></div>
+
+    <div id="processing" class="card processing">
+      <div class="spinner"></div>
+      <h3>正在处理您的请求...</h3>
+      <div id="stage1" class="stage">步骤 1: AI 理解您的输入</div>
+      <div id="stage2" class="stage">步骤 2: 执行命理计算</div>
+      <div id="stage3" class="stage">步骤 3: AI 生成解读</div>
+    </div>
+
+    <div id="result" class="card result">
+      <h2>📊 分析结果</h2>
+      <div class="summary-box">
+        <h3>📌 摘要</h3>
+        <p id="resultSummary">示例结果摘要...</p>
+      </div>
+      <div id="resultSections"></div>
+    </div>
+
+    <div class="card" style="background: rgba(255,255,255,0.95);">
+      <h3 style="color: #333; margin-bottom: 15px;">💡 使用说明</h3>
+      <p style="color: #555; line-height: 1.8;">
+        <strong>注意：</strong>此演示为模拟模式。要使用真实 LLM 功能，请运行命令行示例：
+      </p>
+      <pre style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; overflow-x: auto;">export ZHIPU_API_KEY=your-key
+npm run example:llm</pre>
+      <p style="color: #888; font-size: 0.95em;">
+        📖 详细配置说明请查看：<code>DEMO_README.md</code>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const DEMO_MODE = true;
+
+    function updateStage(stageNum, status) {
+      const stage = document.getElementById(`stage${stageNum}`);
+      stage.classList.remove('active', 'completed');
+      if (status === 'active') stage.classList.add('active');
+      else if (status === 'completed') stage.classList.add('completed');
+    }
+
+    async function analyze() {
+      const userInput = document.getElementById('userInput').value.trim();
+      if (!userInput) {
+        showError('请输入您的问题');
+        return;
+      }
+
+      document.getElementById('error').classList.remove('show');
+      document.getElementById('result').classList.remove('show');
+      
+      const processing = document.getElementById('processing');
+      const analyzeBtn = document.querySelector('.btn');
+      processing.classList.add('show');
+      analyzeBtn.disabled = true;
+
+      updateStage(1, 'active');
+      updateStage(2, '');
+      updateStage(3, '');
+
+      try {
+        await sleep(1500);
+        updateStage(1, 'completed');
+        updateStage(2, 'active');
+
+        await sleep(800);
+        updateStage(2, 'completed');
+        updateStage(3, 'active');
+
+        await sleep(2000);
+        updateStage(3, 'completed');
+
+        showDemoResult();
+      } catch (error) {
+        showError('分析失败: ' + error.message);
+      } finally {
+        processing.classList.remove('show');
+        analyzeBtn.disabled = false;
+      }
+    }
+
+    function showDemoResult() {
+      document.getElementById('resultSummary').textContent = 
+        '您的日主为甲木，生于冬季水旺之时，五行偏弱需要火土帮扶。从命局看，您性格温和但略显优柔寡断，善于思考但行动力不足。';
+      
+      const sections = [
+        {
+          title: '四柱分析',
+          content: '您的八字为：庚午年 己丑月 甲子日 丙寅时。年柱庚午代表祖辈与早年环境，金火相战，显示家庭环境较为严格...'
+        },
+        {
+          title: '五行与用神',
+          content: '您的五行分布：木2 火2 土2 金1 水1，看似平衡但实际上日主甲木生于冬季，水旺木寒，五行偏弱...'
+        }
+      ];
+
+      const sectionsContainer = document.getElementById('resultSections');
+      sectionsContainer.innerHTML = '';
+      sections.forEach(section => {
+        const div = document.createElement('div');
+        div.className = 'section';
+        div.innerHTML = `<h3>${section.title}</h3><p>${section.content}</p>`;
+        sectionsContainer.appendChild(div);
+      });
+
+      document.getElementById('result').classList.add('show');
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function showError(message) {
+      const errorDiv = document.getElementById('error');
+      errorDiv.innerHTML = `<h4>❌ 错误</h4><p>${message}</p>`;
+      errorDiv.classList.add('show');
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+  </script>
+</body>
+</html>

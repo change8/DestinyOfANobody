@@ -59,11 +59,11 @@ export class OpenAIClient extends LLMClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as any;
       throw new Error(`OpenAI API Error: ${error.error?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     return {
       content: data.choices[0].message.content,
@@ -112,11 +112,11 @@ export class AnthropicClient extends LLMClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as any;
       throw new Error(`Anthropic API Error: ${error.error?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     return {
       content: data.content[0].text,
@@ -154,11 +154,11 @@ export class ZhipuClient extends LLMClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as any;
       throw new Error(`Zhipu API Error: ${error.error?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     return {
       content: data.choices[0].message.content,
@@ -200,11 +200,11 @@ export class QwenClient extends LLMClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as any;
       throw new Error(`Qwen API Error: ${error.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     return {
       content: data.output.text,
@@ -242,11 +242,11 @@ export class DeepSeekClient extends LLMClient {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      const error = await response.json() as any;
       throw new Error(`DeepSeek API Error: ${error.error?.message || 'Unknown error'}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
 
     return {
       content: data.choices[0].message.content,
