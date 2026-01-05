@@ -6,6 +6,8 @@
 
 本项目是一款专注于传统易经、八字命理的微信小程序，旨在为用户提供专业、准确的命理分析服务。项目遵循传统命理学原理，使用现代算法实现八字排盘、大运流年、易经占卜等核心功能。
 
+当前仓库已将算命引擎（Fortune Engine）提升到根目录，文档合并到单一的 `docs/` 目录，方便后续前端/后端接入。
+
 **核心特色：**
 - ✨ 精准的八字排盘算法（基于天干地支计算）
 - 🎯 完整的命理分析体系（十神、纳音、藏干等）
@@ -28,6 +30,7 @@
 - **[算命逻辑说明](docs/算命逻辑说明.md)** - 深入了解八字排盘、易经算法的核心逻辑
 - **[易经八字基础知识](docs/易经八字基础知识.md)** - 学习命理学基础理论和原理
 - **[数据库设计文档](docs/数据库设计文档.md)** - 查看数据库表结构、字段说明、关系设计
+- **[Fortune Engine 文档导航](docs/README.md)** - 引擎相关的 8+1 文档索引
 
 ### 3️⃣ 项目管理文档（日常开发）
 
@@ -37,78 +40,55 @@
 
 ### 环境要求
 
-- Node.js >= 16.x
-- 微信开发者工具 >= 稳定版
-- MySQL >= 8.0 / MongoDB >= 5.0
-- Redis >= 6.0（可选，用于缓存）
+- Node.js >= 16.x（当前引擎代码）
+- （规划）微信开发者工具 >= 稳定版
+- （规划）MySQL >= 8.0 / MongoDB >= 5.0
+- （规划）Redis >= 6.0（可选，用于缓存）
 
-### 安装步骤
+### 安装步骤（当前代码结构）
 
 ```bash
 # 1. 克隆项目
 git clone <repository-url>
 cd DestinyOfANobody
 
-# 2. 安装依赖（小程序端）
-cd miniprogram
+# 2. 安装算命引擎依赖
 npm install
 
-# 3. 安装依赖（后端服务）
-cd ../server
-npm install
-
-# 4. 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，填写数据库连接等配置
-
-# 5. 初始化数据库
-npm run db:migrate
-
-# 6. 启动开发服务器
-npm run dev
+# 3. 运行测试 / 构建
+npm test
+npm run build
 ```
+
+> 说明：前端（miniprogram）和后端（server）尚未落地到仓库，待引擎稳定后再补充。文档已全部集中在 `docs/`。
 
 ### 目录结构
 
 ```
 DestinyOfANobody/
-├── miniprogram/          # 微信小程序前端代码
-│   ├── pages/           # 页面文件
-│   ├── components/      # 组件
-│   ├── utils/           # 工具函数
-│   └── api/             # API 接口封装
-├── server/              # 后端服务代码
-│   ├── src/
-│   │   ├── controllers/ # 控制器
-│   │   ├── services/    # 业务逻辑
-│   │   ├── models/      # 数据模型
-│   │   └── utils/       # 工具函数
-│   └── tests/           # 测试文件
-├── fortune-engine/      # 算命引擎（独立NPM包）
-│   ├── bazi/           # 八字算法
-│   ├── yijing/         # 易经算法
-│   └── calendar/       # 农历日历
-├── docs/               # 项目文档
-└── README.md           # 本文件
+├── src/                 # 算命引擎源码（bazi、meihua、llm 等模块）
+├── docs/                # 全部项目/引擎文档（已合并）
+├── examples/            # 示例
+├── demo.html            # 浏览器示例页
+├── meihua-example.ts    # 梅花易数示例
+├── test-example.ts      # 测试示例
+├── jest.config.js
+├── rollup.config.js
+├── tsconfig.json
+├── package.json
+└── README.md
 ```
 
 ## 🛠️ 技术栈
-
-### 前端（小程序）
-- 微信小程序原生框架
-- TypeScript
-- Vant Weapp UI组件库
-
-### 后端
-- Node.js + NestJS
-- TypeScript
-- MySQL / MongoDB
-- Redis（缓存）
 
 ### 算命引擎
 - 纯JavaScript实现
 - 无外部依赖
 - 支持独立使用
+
+### （规划中）
+- 前端：微信小程序原生 + TypeScript + Vant Weapp
+- 后端：NestJS + MySQL/MongoDB + Redis
 
 ## 📚 参考资料
 
