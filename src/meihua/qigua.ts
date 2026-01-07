@@ -6,6 +6,7 @@ import { BA_GUA_BY_INDEX, type BaGua } from './bagua-data';
 import { getGuaName } from './liushisi-gua';
 import type { CharAnalysisResult } from './char-analysis';
 import { analyzeCharacter } from './char-analysis';
+import { solarToLunar } from '../utils/lunar-converter';
 
 /**
  * 卦象结果
@@ -60,32 +61,79 @@ function getChangingLine(num: number): number {
 }
 
 /**
- * 获取变卦
+ * 八卦的二进制表示（阳=1，阴=0，从下往上三个爻）
+ * 例如：乾卦（☰）三个阳爻 = 111
+ */
+const GUA_TO_BINARY: Record<BaGua, string> = {
+  '乾': '111',  // ☰ 三阳爻
+  '兑': '011',  // ☱ 上阴下二阳
+  '离': '101',  // ☲ 中阴上下阳
+  '震': '001',  // ☳ 上二阴下阳
+  '巽': '110',  // ☴ 下阴上二阳
+  '坎': '010',  // ☵ 上下阴中阳
+  '艮': '100',  // ☶ 下二阴上阳
+  '坤': '000'   // ☷ 三阴爻
+};
+
+/**
+ * 根据二进制字符串反查八卦
+ */
+const BINARY_TO_GUA: Record<string, BaGua> = Object.fromEntries(
+  Object.entries(GUA_TO_BINARY).map(([gua, binary]) => [binary, gua as BaGua])
+) as Record<string, BaGua>;
+
+/**
+ * 获取变卦（正确实现：翻转动爻的阴阳）
+ *
+ * 原理：
+ * 1. 将上下卦转为二进制表示（六爻从下往上：初、二、三、四、五、上）
+ * 2. 翻转动爻位置的阴阳（阳爻变阴爻，阴爻变阳爻）
+ * 3. 将新的六爻重新拆分为上下卦
+ *
+ * 例如：水山蹇（☵☶）动初爻
+ * - 下卦艮（☶）= 100，上卦坎（☵）= 010
+ * - 六爻从下往上：1-0-0-0-1-0
+ * - 初爻（第1爻）翻转：1→0，得到 0-0-0-0-1-0
+ * - 新下卦：000 = 坤（☷），新上卦：010 = 坎（☵）
+ * - 变卦：水地比（☵☷）
  */
 function getChangeGua(upperGua: BaGua, lowerGua: BaGua, changingLine: number): { upperGua: BaGua; lowerGua: BaGua } {
-  // 这里简化处理，实际应该根据动爻位置改变对应的爻
-  // 1-3爻在下卦，4-6爻在上卦
+  // 1. 获取上下卦的二进制表示
+  const lowerBinary = GUA_TO_BINARY[lowerGua];  // 下卦三爻（初、二、三）
+  const upperBinary = GUA_TO_BINARY[upperGua];  // 上卦三爻（四、五、上）
 
-  // 八卦的索引
-  const guaToIndex: Record<BaGua, number> = {
-    '乾': 1, '兑': 2, '离': 3, '震': 4,
-    '巽': 5, '坎': 6, '艮': 7, '坤': 8
-  };
+  // 2. 组合成六爻（从下往上）
+  const sixLines = lowerBinary + upperBinary;
 
-  let newUpperIndex = guaToIndex[upperGua];
-  let newLowerIndex = guaToIndex[lowerGua];
+  // 3. 翻转动爻（阳变阴，阴变阳）
+  const lines = sixLines.split('');
+  const index = changingLine - 1;  // 转为数组索引（0-5）
+  lines[index] = lines[index] === '1' ? '0' : '1';  // 翻转爻
 
-  if (changingLine <= 3) {
-    // 动爻在下卦，下卦变化
-    newLowerIndex = (newLowerIndex % 8) + 1;
-  } else {
-    // 动爻在上卦，上卦变化
-    newUpperIndex = (newUpperIndex % 8) + 1;
+  // 4. 重新组合
+  const newSixLines = lines.join('');
+
+  // 5. 拆分回上下卦
+  const newLowerBinary = newSixLines.substring(0, 3);  // 前三位是下卦
+  const newUpperBinary = newSixLines.substring(3, 6);  // 后三位是上卦
+
+  // 6. 转回八卦
+  const newLowerGua = BINARY_TO_GUA[newLowerBinary];
+  const newUpperGua = BINARY_TO_GUA[newUpperBinary];
+
+  // 7. 防御性检查
+  if (!newLowerGua || !newUpperGua) {
+    console.error('变卦计算错误：', {
+      original: { upperGua, lowerGua, changingLine },
+      binary: { sixLines, newSixLines, newLowerBinary, newUpperBinary }
+    });
+    // 降级处理：返回原卦
+    return { upperGua, lowerGua };
   }
 
   return {
-    upperGua: BA_GUA_BY_INDEX[newUpperIndex],
-    lowerGua: BA_GUA_BY_INDEX[newLowerIndex]
+    upperGua: newUpperGua,
+    lowerGua: newLowerGua
   };
 }
 
@@ -127,63 +175,77 @@ export function qiguaByNumber(num1: number, num2?: number, num3?: number): GuaRe
 }
 
 /**
- * 汉字起卦（增强版，包含字义分析）
- * @param char 汉字
- * @param strokeCount 笔画数（如果不提供，会尝试计算）
+ * 汉字起卦（多字版 - 推荐）
+ *
+ * 传统方法：
+ * - 双字起卦：第一字笔画为上卦，第二字笔画为下卦，总笔画为动爻
+ * - 多字起卦：可用前两字、或字数与总笔画组合
+ *
+ * 例如："云哲" = 云(4画) + 哲(10画)
+ * - 上卦：4 ÷ 8 余 4 → 震卦
+ * - 下卦：10 ÷ 8 余 2 → 兑卦
+ * - 动爻：14 ÷ 6 余 2 → 二爻
+ *
+ * @param chars 汉字字符串（建议2个字）
+ * @param strokeCounts 笔画数数组（可选）
  */
-export function qiguaByChar(char: string, strokeCount?: number): GuaResult {
-  // 获取准确笔画数
-  const strokes = strokeCount || getAccurateStrokeCount(char);
+export function qiguaByChars(chars: string, strokeCounts?: number[]): GuaResult {
+  // 1. 处理多字情况
+  const charArray = Array.from(chars);
 
-  // 进行字义分析
-  const charAnalysis = analyzeCharacter(char, strokes);
+  if (charArray.length === 0) {
+    throw new Error('请至少提供一个字');
+  }
 
-  // 使用笔画数起卦
-  const upperNumber = strokes;
-  const lowerNumber = strokes;
-  const totalNumber = strokes * 2;
+  // 2. 获取笔画数
+  let strokes: number[];
+  if (strokeCounts && strokeCounts.length > 0) {
+    strokes = strokeCounts;
+  } else {
+    strokes = charArray.map(c => getAccurateStrokeCount(c));
+  }
 
-  const basicGua = qiguaByNumber(upperNumber, lowerNumber, totalNumber);
+  // 3. 根据字数确定起卦方法
+  let upperNumber: number;
+  let lowerNumber: number;
+  let totalNumber: number;
 
-  return {
-    ...basicGua,
-    method: `字占起卦（${char}字，${strokes}画）`,
-    rawData: {
-      ...basicGua.rawData,
-      character: char
-    },
-    charAnalysis
-  };
-}
+  if (charArray.length === 1) {
+    // 单字起卦：需要结合时间或字形拆分
+    // 这里使用简化方法：笔画数 + 当前时辰
+    const singleStroke = strokes[0];
+    const now = new Date();
+    const hour = now.getHours();
+    const shiChen = Math.floor((hour + 1) / 2) % 12 || 12;
 
-/**
- * 时间起卦
- * @param date 时间（默认当前时间）
- */
-export function qiguaByTime(date: Date = new Date()): GuaResult {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;  // 1-12
-  const day = date.getDate();         // 1-31
-  const hour = date.getHours();       // 0-23
+    upperNumber = singleStroke;
+    lowerNumber = singleStroke + shiChen;
+    totalNumber = singleStroke + shiChen;
+  } else {
+    // 双字或多字起卦：第一字为上卦，第二字为下卦
+    upperNumber = strokes[0];
+    lowerNumber = strokes[1];
+    totalNumber = strokes.reduce((sum, s) => sum + s, 0);
+  }
 
-  // 转换时辰（每两小时一个时辰）
-  const shiChen = Math.floor((hour + 1) / 2) % 12 || 12;
-
-  // 上卦 = (年数 + 月数 + 日数) % 8
-  const upperNumber = year + month + day;
-
-  // 下卦 = (年数 + 月数 + 日数 + 时数) % 8
-  const lowerNumber = year + month + day + shiChen;
-
-  // 动爻 = (年数 + 月数 + 日数 + 时数) % 6
-  const totalNumber = year + month + day + shiChen;
-
+  // 4. 起卦
   const upperGua = getGuaByNumber(upperNumber);
   const lowerGua = getGuaByNumber(lowerNumber);
   const changingLine = getChangingLine(totalNumber);
   const mainGuaName = getGuaName(upperGua, lowerGua);
 
+  // 5. 计算变卦
   const changeGuaResult = getChangeGua(upperGua, lowerGua, changingLine);
+
+  // 6. 进行字义分析（仅对前两个字）
+  const analysisChars = charArray.slice(0, 2);
+  const charAnalysis = analyzeCharacter(analysisChars.join(''), totalNumber);
+
+  // 7. 格式化方法说明
+  const strokeInfo = charArray.map((c, i) => `${c}(${strokes[i]}画)`).join(' + ');
+  const method = charArray.length === 1
+    ? `字占起卦（${strokeInfo}，结合时辰）`
+    : `字占起卦（${strokeInfo}，共${totalNumber}画）`;
 
   return {
     upperGua,
@@ -195,7 +257,88 @@ export function qiguaByTime(date: Date = new Date()): GuaResult {
       lowerGua: changeGuaResult.lowerGua,
       guaName: getGuaName(changeGuaResult.upperGua, changeGuaResult.lowerGua)
     },
-    method: `时间起卦（${year}年${month}月${day}日${hour}时）`,
+    method,
+    rawData: {
+      upperNumber,
+      lowerNumber,
+      totalNumber,
+      character: chars
+    },
+    charAnalysis
+  };
+}
+
+/**
+ * 汉字起卦（单字简化版，保留向后兼容）
+ * @param char 汉字
+ * @param strokeCount 笔画数（如果不提供，会尝试计算）
+ * @deprecated 建议使用 qiguaByChars 代替，支持更准确的多字起卦
+ */
+export function qiguaByChar(char: string, strokeCount?: number): GuaResult {
+  // 兼容旧接口，调用新的多字起卦函数
+  return qiguaByChars(char, strokeCount ? [strokeCount] : undefined);
+}
+
+/**
+ * 时间起卦（使用农历）
+ *
+ * 梅花易数的时间起卦必须使用农历年月日，而非公历！
+ *
+ * 公式：
+ * - 上卦 = (农历年 + 农历月 + 农历日) ÷ 8 的余数
+ * - 下卦 = (农历年 + 农历月 + 农历日 + 时辰) ÷ 8 的余数
+ * - 动爻 = (农历年 + 农历月 + 农历日 + 时辰) ÷ 6 的余数
+ *
+ * @param date 时间（默认当前时间）
+ */
+export function qiguaByTime(date: Date = new Date()): GuaResult {
+  // 1. 转换为农历日期
+  const lunar = solarToLunar(date);
+  const year = lunar.year;   // 使用农历年
+  const month = lunar.month; // 使用农历月
+  const day = lunar.day;     // 使用农历日
+  const hour = date.getHours();  // 时辰仍用公历小时计算
+
+  // 2. 转换时辰（每两小时一个时辰）
+  // 子(23-01) 丑(01-03) 寅(03-05) 卯(05-07) 辰(07-09) 巳(09-11)
+  // 午(11-13) 未(13-15) 申(15-17) 酉(17-19) 戌(19-21) 亥(21-23)
+  const shiChen = Math.floor((hour + 1) / 2) % 12 || 12;
+
+  // 3. 按照梅花易数公式计算
+  // 上卦 = (年 + 月 + 日) % 8
+  const upperNumber = year + month + day;
+
+  // 下卦 = (年 + 月 + 日 + 时) % 8
+  const lowerNumber = year + month + day + shiChen;
+
+  // 动爻 = (年 + 月 + 日 + 时) % 6
+  const totalNumber = year + month + day + shiChen;
+
+  // 4. 起卦
+  const upperGua = getGuaByNumber(upperNumber);
+  const lowerGua = getGuaByNumber(lowerNumber);
+  const changingLine = getChangingLine(totalNumber);
+  const mainGuaName = getGuaName(upperGua, lowerGua);
+
+  // 5. 计算变卦
+  const changeGuaResult = getChangeGua(upperGua, lowerGua, changingLine);
+
+  // 6. 格式化日期信息（用于显示）
+  const solarYear = date.getFullYear();
+  const solarMonth = date.getMonth() + 1;
+  const solarDay = date.getDate();
+
+  return {
+    upperGua,
+    lowerGua,
+    changingLine,
+    mainGuaName,
+    changeGua: {
+      upperGua: changeGuaResult.upperGua,
+      lowerGua: changeGuaResult.lowerGua,
+      guaName: getGuaName(changeGuaResult.upperGua, changeGuaResult.lowerGua)
+    },
+    method: `时间起卦（公历${solarYear}年${solarMonth}月${solarDay}日${hour}时 / 农历${year}年${month}月${day}日）`,
     rawData: {
       upperNumber,
       lowerNumber,

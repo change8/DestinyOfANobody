@@ -28,6 +28,7 @@ export {
   type GuaResult,
   qiguaByNumber,
   qiguaByChar,
+  qiguaByChars,  // 新增：多字起卦（推荐使用）
   qiguaByTime,
   getAccurateStrokeCount,
   CHAR_STROKES
