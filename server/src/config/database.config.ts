@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import path from 'path';
+import fs from 'fs';
 import { config } from './env.config';
 import { User } from '../models/User.entity';
 import { DivinationRecord } from '../models/DivinationRecord.entity';
@@ -17,6 +18,13 @@ export const AppDataSource = new DataSource({
 
 export const initializeDatabase = async (): Promise<void> => {
   try {
+    // 确保数据库目录存在
+    const dbDir = path.dirname(config.database.path);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log(`✅ 创建数据库目录: ${dbDir}`);
+    }
+
     await AppDataSource.initialize();
     console.log('✅ 数据库连接成功');
   } catch (error) {

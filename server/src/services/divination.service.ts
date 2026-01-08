@@ -6,6 +6,8 @@ import { DivinationRecord } from '../models';
 import type { BaziInput } from '../../../src/types';
 import type { GuaResult } from '../../../src/meihua/qigua';
 import { GAN_WUXING } from '../../../src/data/constants';
+import { BA_GUA_DATA } from '../../../src/meihua/bagua-data';
+import type { BaGua } from '../../../src/meihua/bagua-data';
 
 // 前端期望的八字输入格式
 interface FrontendBaziInput {
@@ -32,10 +34,72 @@ interface FrontendBaziResult {
   mingju: string;
 }
 
+// 前端期望的卦象格式
+interface FrontendGua {
+  name: string;
+  symbol: string;
+  number: number;
+  wuxing: string;
+  nature: string;
+}
+
+// 前端期望的梅花易数结果格式
+interface FrontendMeihuaResult {
+  benGua: FrontendGua;
+  bianGua: FrontendGua;
+  dongYao: number;
+  huGua?: FrontendGua;
+  timestamp: string;
+  inputMethod: string;
+}
+
 export class DivinationService {
   // 移除模块加载时的 getRepository 调用，改为在方法内获取
   private getRecordRepository() {
     return AppDataSource.getRepository(DivinationRecord);
+  }
+
+  /**
+   * 将引擎的 BaGua 转换为前端期望的 Gua 格式
+   */
+  private convertToFrontendGua(upperGua: BaGua, lowerGua: BaGua, guaName: string): FrontendGua {
+    const upperInfo = BA_GUA_DATA[upperGua];
+    const lowerInfo = BA_GUA_DATA[lowerGua];
+
+    return {
+      name: guaName,
+      symbol: `${upperInfo.trigram}${lowerInfo.trigram}`,
+      number: upperInfo.index * 10 + lowerInfo.index,
+      wuxing: `${upperInfo.nature}${lowerInfo.nature}`,
+      nature: `上${upperGua}下${lowerGua}`
+    };
+  }
+
+  /**
+   * 将引擎的 GuaResult 转换为前端期望的格式
+   */
+  private convertMeihuaResultToFrontend(guaResult: GuaResult, inputMethod: string): FrontendMeihuaResult {
+    const benGua = this.convertToFrontendGua(
+      guaResult.upperGua,
+      guaResult.lowerGua,
+      guaResult.mainGuaName
+    );
+
+    const bianGua = guaResult.changeGua
+      ? this.convertToFrontendGua(
+          guaResult.changeGua.upperGua,
+          guaResult.changeGua.lowerGua,
+          guaResult.changeGua.guaName
+        )
+      : benGua;
+
+    return {
+      benGua,
+      bianGua,
+      dongYao: guaResult.changingLine,
+      timestamp: new Date().toISOString(),
+      inputMethod
+    };
   }
 
   /**
@@ -60,6 +124,17 @@ export class DivinationService {
     const engineResult = baziCalculator.calculate(engineInput);
 
     // 3. 转换引擎结果为前端格式
+    // 计算年龄：使用公历年份，避免农历临界日期偏差
+    const currentYear = new Date().getFullYear();
+    const birthYear = year;
+    const currentMonth = new Date().getMonth() + 1;
+    const currentDay = new Date().getDate();
+    let age = currentYear - birthYear;
+    // 如果今年的生日还没到，年龄减1
+    if (currentMonth < month || (currentMonth === month && currentDay < day)) {
+      age--;
+    }
+
     const frontendResult: FrontendBaziResult = {
       yearPillar: {
         gan: engineResult.pillars.year.gan,
@@ -79,7 +154,7 @@ export class DivinationService {
       },
       solarDate: `${year}年${month}月${day}日 ${hour}时${minute}分`,
       lunarDate: `${engineResult.lunar.yearName} ${engineResult.lunar.monthName}${engineResult.lunar.dayName}`,
-      age: new Date().getFullYear() - engineResult.lunar.year,
+      age,
       gender: gender === 'male' ? '男' : '女',
       dayGanWuxing: GAN_WUXING[engineResult.pillars.day.gan],
       mingju: engineResult.nayin.day
@@ -105,20 +180,24 @@ export class DivinationService {
 
   /**
    * 梅花易数起卦
-   * 注意：结果会在 controller 层转换为前端格式
+   * 计算卦象并保存前端格式到历史记录
    */
   async meihuaDivination(method: string, input: any, question: string, userId?: number) {
     let guaResult: GuaResult;
+    let inputMethod: string;
 
     switch (method) {
       case 'char':
         guaResult = qiguaByChars(input.chars || input.char);
+        inputMethod = '文字起卦';
         break;
       case 'time':
         guaResult = qiguaByTime(input.date ? new Date(input.date) : undefined);
+        inputMethod = '时间起卦';
         break;
       case 'number':
         guaResult = qiguaByNumber(input.num1, input.num2, input.num3);
+        inputMethod = '数字起卦';
         break;
       default:
         throw new Error('不支持的起卦方法');
@@ -127,8 +206,9 @@ export class DivinationService {
     // 失物占分析
     const analysis = divineForLostItem(guaResult, question);
 
-    // 保存到历史记录（暂时保存引擎格式，后续可优化为前端格式）
+    // 转换为前端格式并保存到历史记录
     if (userId) {
+      const frontendResult = this.convertMeihuaResultToFrontend(guaResult, inputMethod);
       const recordRepository = this.getRecordRepository();
       const record = recordRepository.create({
         userId,
@@ -136,7 +216,7 @@ export class DivinationService {
         title: `${question}`,
         question,
         inputData: JSON.stringify({ method, input }),
-        resultData: JSON.stringify({ guaResult, analysis }),
+        resultData: JSON.stringify(frontendResult),  // ✅ 保存前端格式
       });
       await recordRepository.save(record);
     }

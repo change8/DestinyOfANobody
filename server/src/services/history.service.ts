@@ -27,6 +27,7 @@ export class HistoryService {
 
     const [records, total] = await queryBuilder.getManyAndCount();
 
+    // 拆解 pagination 到顶层，与前端 DTO 对齐
     return {
       records: records.map(r => ({
         id: r.id,
@@ -35,15 +36,12 @@ export class HistoryService {
         question: r.question,
         createdAt: r.createdAt.toISOString(),
         isFavorite: r.isFavorite,
-        resultData: r.getResultData(),  // 添加 resultData，前端列表需要显示
-        llmInterpretation: r.llmInterpretation,  // 添加 LLM 解读
+        resultData: r.getResultData(),
+        llmInterpretation: r.llmInterpretation,
       })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      total,
+      page,
+      pageSize: limit,  // 前端使用 pageSize，后端使用 limit
     };
   }
 
