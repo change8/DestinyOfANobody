@@ -1,7 +1,71 @@
 import { Request, Response } from 'express';
 import { divinationService } from '../services/divination.service';
+import { BA_GUA_DATA } from '../../../src/meihua/bagua-data';
+import type { BaGua } from '../../../src/meihua/bagua-data';
+import type { GuaResult } from '../../../src/meihua/qigua';
+
+// 前端期望的卦象格式
+interface FrontendGua {
+  name: string;
+  symbol: string;
+  number: number;
+  wuxing: string;
+  nature: string;
+}
+
+// 前端期望的梅花易数结果格式
+interface FrontendMeihuaResult {
+  benGua: FrontendGua;
+  bianGua: FrontendGua;
+  dongYao: number;
+  huGua?: FrontendGua;
+  timestamp: string;
+  inputMethod: string;
+}
 
 export class DivinationController {
+  /**
+   * 将引擎的 BaGua 转换为前端期望的 Gua 格式
+   */
+  private convertToFrontendGua(upperGua: BaGua, lowerGua: BaGua, guaName: string): FrontendGua {
+    const upperInfo = BA_GUA_DATA[upperGua];
+    const lowerInfo = BA_GUA_DATA[lowerGua];
+
+    return {
+      name: guaName,
+      symbol: `${upperInfo.trigram}${lowerInfo.trigram}`,
+      number: upperInfo.index * 10 + lowerInfo.index, // 简单的编号规则
+      wuxing: `${upperInfo.nature}${lowerInfo.nature}`,
+      nature: `上${upperGua}下${lowerGua}`
+    };
+  }
+
+  /**
+   * 将引擎的 GuaResult 转换为前端期望的格式
+   */
+  private convertMeihuaResult(guaResult: GuaResult, inputMethod: string): FrontendMeihuaResult {
+    const benGua = this.convertToFrontendGua(
+      guaResult.upperGua,
+      guaResult.lowerGua,
+      guaResult.mainGuaName
+    );
+
+    const bianGua = guaResult.changeGua
+      ? this.convertToFrontendGua(
+          guaResult.changeGua.upperGua,
+          guaResult.changeGua.lowerGua,
+          guaResult.changeGua.guaName
+        )
+      : benGua; // 如果没有变卦，使用本卦
+
+    return {
+      benGua,
+      bianGua,
+      dongYao: guaResult.changingLine,
+      timestamp: new Date().toISOString(),
+      inputMethod
+    };
+  }
   /**
    * 八字排盘
    * POST /api/divination/bazi
@@ -98,17 +162,11 @@ export class DivinationController {
         req.user?.userId
       );
 
-      // 返回前端期待的格式
-      res.json({
-        benGua: guaResult.benGua,
-        bianGua: guaResult.bianGua,
-        dongYao: guaResult.dongYao,
-        huGua: guaResult.huGua,
-        cuoGua: guaResult.cuoGua,
-        zongGua: guaResult.zongGua,
-        timestamp: new Date().toISOString(),
-        inputMethod: type === 'time' ? '时间起卦' : type === 'chars' ? '文字起卦' : '数字起卦',
-      });
+      // 转换为前端期望的格式
+      const inputMethodText = type === 'time' ? '时间起卦' : type === 'chars' ? '文字起卦' : '数字起卦';
+      const frontendResult = this.convertMeihuaResult(guaResult, inputMethodText);
+
+      res.json(frontendResult);
     } catch (error) {
       res.status(400).json({
         message: error instanceof Error ? error.message : '起卦失败',

@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from '../config/env.config';
 
 export interface JwtPayload {
@@ -10,9 +10,10 @@ export interface JwtPayload {
  * 生成 JWT token
  */
 export const generateToken = (payload: JwtPayload): string => {
-  return jwt.sign(payload, config.jwt.secret, {
-    expiresIn: config.jwt.expiresIn,
-  });
+  const options: SignOptions = {
+    expiresIn: config.jwt.expiresIn as any, // 临时绕过类型检查，expiresIn 支持 string 格式如 "7d"
+  };
+  return jwt.sign(payload, config.jwt.secret, options);
 };
 
 /**

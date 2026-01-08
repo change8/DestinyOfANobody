@@ -33,8 +33,10 @@ export class HistoryService {
         type: r.type,
         title: r.title,
         question: r.question,
-        createdAt: r.createdAt.toISOString(),  // 改为 camelCase
-        isFavorite: r.isFavorite,  // 改为 camelCase
+        createdAt: r.createdAt.toISOString(),
+        isFavorite: r.isFavorite,
+        resultData: r.getResultData(),  // 添加 resultData，前端列表需要显示
+        llmInterpretation: r.llmInterpretation,  // 添加 LLM 解读
       })),
       pagination: {
         page,
