@@ -21,15 +21,24 @@ export interface AuthResponse {
 }
 
 export class AuthService {
-  private userRepository = AppDataSource.getRepository(User);
-  private preferencesRepository = AppDataSource.getRepository(UserPreferences);
+  // 移除模块加载时的 getRepository 调用
+  private getUserRepository() {
+    return AppDataSource.getRepository(User);
+  }
+
+  private getPreferencesRepository() {
+    return AppDataSource.getRepository(UserPreferences);
+  }
 
   /**
    * 用户注册
    */
   async register(input: RegisterInput): Promise<AuthResponse> {
+    const userRepository = this.getUserRepository();
+    const preferencesRepository = this.getPreferencesRepository();
+
     // 检查用户名是否已存在
-    const existingUser = await this.userRepository.findOne({
+    const existingUser = await userRepository.findOne({
       where: [{ username: input.username }, { email: input.email }],
     });
 
@@ -43,22 +52,22 @@ export class AuthService {
     }
 
     // 创建用户
-    const user = this.userRepository.create({
+    const user = userRepository.create({
       username: input.username,
       email: input.email,
       passwordHash: await hashPassword(input.password),
       nickname: input.nickname || input.username,
     });
 
-    await this.userRepository.save(user);
+    await userRepository.save(user);
 
     // 创建用户偏好设置
-    const preferences = this.preferencesRepository.create({
+    const preferences = preferencesRepository.create({
       userId: user.id,
       theme: 'light',
       language: 'zh-CN',
     });
-    await this.preferencesRepository.save(preferences);
+    await preferencesRepository.save(preferences);
 
     // 生成 token
     const token = generateToken({
@@ -76,8 +85,10 @@ export class AuthService {
    * 用户登录
    */
   async login(input: LoginInput): Promise<AuthResponse> {
+    const userRepository = this.getUserRepository();
+
     // 查找用户
-    const user = await this.userRepository.findOne({
+    const user = await userRepository.findOne({
       where: { email: input.email },
     });
 
@@ -97,7 +108,7 @@ export class AuthService {
 
     // 更新最后登录时间
     user.lastLoginAt = new Date();
-    await this.userRepository.save(user);
+    await userRepository.save(user);
 
     // 生成 token
     const token = generateToken({
@@ -115,7 +126,8 @@ export class AuthService {
    * 获取当前用户信息
    */
   async getCurrentUser(userId: number): Promise<Omit<User, 'passwordHash'>> {
-    const user = await this.userRepository.findOne({
+    const userRepository = this.getUserRepository();
+    const user = await userRepository.findOne({
       where: { id: userId },
     });
 

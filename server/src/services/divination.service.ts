@@ -7,7 +7,10 @@ import type { BaziInput } from '../../src/types';
 import type { GuaResult } from '../../src/meihua/qigua';
 
 export class DivinationService {
-  private recordRepository = AppDataSource.getRepository(DivinationRecord);
+  // 移除模块加载时的 getRepository 调用，改为在方法内获取
+  private getRecordRepository() {
+    return AppDataSource.getRepository(DivinationRecord);
+  }
 
   /**
    * 八字排盘
@@ -16,18 +19,21 @@ export class DivinationService {
     const result = baziCalculator.calculate(input);
 
     // 保存到历史记录
+    let recordId: number | null = null;
     if (userId) {
-      const record = this.recordRepository.create({
+      const recordRepository = this.getRecordRepository();
+      const record = recordRepository.create({
         userId,
         type: 'bazi',
         title: `${input.name || '未命名'}的八字排盘`,
         inputData: JSON.stringify(input),
         resultData: JSON.stringify(result),
       });
-      await this.recordRepository.save(record);
+      const savedRecord = await recordRepository.save(record);
+      recordId = savedRecord.id;
     }
 
-    return { result, recordId: userId ? (await this.recordRepository.save(record)).id : null };
+    return { result, recordId };
   }
 
   /**
@@ -55,7 +61,8 @@ export class DivinationService {
 
     // 保存到历史记录
     if (userId) {
-      const record = this.recordRepository.create({
+      const recordRepository = this.getRecordRepository();
+      const record = recordRepository.create({
         userId,
         type: 'meihua',
         title: `${question}`,
@@ -63,7 +70,7 @@ export class DivinationService {
         inputData: JSON.stringify({ method, input }),
         resultData: JSON.stringify({ guaResult, analysis }),
       });
-      await this.recordRepository.save(record);
+      await recordRepository.save(record);
     }
 
     return { guaResult, analysis };
