@@ -11,6 +11,35 @@ export class HistoryService {
   }
 
   /**
+   * 从出生日期字符串计算年龄
+   * @param birthDateStr 出生日期字符串（支持 YYYY-MM-DD 等格式）
+   * @returns 年龄，如果无法解析返回 0
+   */
+  private calculateAge(birthDateStr: string): number {
+    try {
+      if (!birthDateStr) return 0;
+
+      const birthDate = new Date(birthDateStr);
+      if (isNaN(birthDate.getTime())) {
+        return 0;
+      }
+
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+
+      // 如果还没过生日，年龄减1
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      return age >= 0 ? age : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
    * 检测并转换旧格式的历史记录数据
    * 兼容引擎格式（旧）→ 前端 DTO 格式（新）
    * @param resultData 原始结果数据
@@ -49,7 +78,7 @@ export class HistoryService {
           },
           solarDate: resultData.input?.birthDate || '未知',
           lunarDate: resultData.lunar ? `${resultData.lunar.yearName} ${resultData.lunar.monthName}${resultData.lunar.dayName}` : '未知',
-          age: 0, // 旧数据无法准确计算年龄
+          age: this.calculateAge(resultData.input?.birthDate || ''),
           gender: resultData.input?.gender === 'male' ? '男' : '女',
           dayGanWuxing: (GAN_WUXING as any)[resultData.pillars.day.gan] || '未知',
           mingju: resultData.nayin?.day || '未知'
@@ -95,16 +124,39 @@ export class HistoryService {
 
         // 智能转换 inputMethod 为中文
         let inputMethod = '未知';
-        const rawMethod = guaResult.method || '';
-        if (rawMethod.includes('时间') || rawMethod.toLowerCase().includes('time')) {
+        const rawMethod = (guaResult.method || '').toLowerCase();
+
+        // 时间起卦关键词检测
+        if (rawMethod.includes('时间') ||
+            rawMethod.includes('time') ||
+            rawMethod.includes('datetime') ||
+            rawMethod.includes('date')) {
           inputMethod = '时间起卦';
-        } else if (rawMethod.includes('文字') || rawMethod.includes('字') || rawMethod.toLowerCase().includes('char')) {
+        }
+        // 文字起卦关键词检测
+        else if (rawMethod.includes('文字') ||
+                 rawMethod.includes('字') ||
+                 rawMethod.includes('char') ||
+                 rawMethod.includes('string') ||
+                 rawMethod.includes('text')) {
           inputMethod = '文字起卦';
-        } else if (rawMethod.includes('数字') || rawMethod.toLowerCase().includes('number')) {
+        }
+        // 数字起卦关键词检测
+        else if (rawMethod.includes('数字') ||
+                 rawMethod.includes('number') ||
+                 rawMethod.includes('num') ||
+                 rawMethod.includes('digit')) {
           inputMethod = '数字起卦';
-        } else if (rawMethod) {
-          // 有值但不匹配已知类型，保留原值
-          inputMethod = rawMethod;
+        }
+        // 有值但不匹配已知类型，尝试从其他特征推断
+        else if (guaResult.method) {
+          // 保留原值但进行标准化
+          const originalMethod = guaResult.method;
+          if (originalMethod.length > 0 && originalMethod.length < 20) {
+            inputMethod = originalMethod; // 保留短字符串原值
+          } else {
+            inputMethod = '自定义起卦'; // 未知格式使用通用描述
+          }
         }
 
         return {
