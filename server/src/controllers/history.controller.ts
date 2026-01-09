@@ -4,7 +4,8 @@ import { historyService } from '../services/history.service';
 export class HistoryController {
   /**
    * 获取历史记录列表
-   * GET /api/history?page=1&limit=20&type=bazi
+   * GET /api/history?page=1&pageSize=20&type=bazi
+   * 兼容旧参数 limit
    */
   async getRecords(req: Request, res: Response): Promise<void> {
     try {
@@ -14,10 +15,11 @@ export class HistoryController {
       }
 
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 20;
+      // 优先读取 pageSize（前端使用），fallback 到 limit（向后兼容）
+      const pageSize = parseInt(req.query.pageSize as string) || parseInt(req.query.limit as string) || 20;
       const type = req.query.type as string | undefined;
 
-      const result = await historyService.getRecords(req.user.userId, page, limit, type);
+      const result = await historyService.getRecords(req.user.userId, page, pageSize, type);
 
       // 直接返回业务数据
       res.json(result);
