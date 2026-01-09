@@ -13,8 +13,11 @@ export class HistoryService {
   /**
    * 检测并转换旧格式的历史记录数据
    * 兼容引擎格式（旧）→ 前端 DTO 格式（新）
+   * @param resultData 原始结果数据
+   * @param type 记录类型
+   * @param createdAt 记录创建时间（用于旧数据的真实时间戳）
    */
-  private normalizeResultData(resultData: any, type: string): any {
+  private normalizeResultData(resultData: any, type: string, createdAt: Date): any {
     if (!resultData) return resultData;
 
     // 八字记录格式检测与转换
@@ -90,12 +93,26 @@ export class HistoryService {
           };
         }
 
+        // 智能转换 inputMethod 为中文
+        let inputMethod = '未知';
+        const rawMethod = guaResult.method || '';
+        if (rawMethod.includes('时间') || rawMethod.toLowerCase().includes('time')) {
+          inputMethod = '时间起卦';
+        } else if (rawMethod.includes('文字') || rawMethod.includes('字') || rawMethod.toLowerCase().includes('char')) {
+          inputMethod = '文字起卦';
+        } else if (rawMethod.includes('数字') || rawMethod.toLowerCase().includes('number')) {
+          inputMethod = '数字起卦';
+        } else if (rawMethod) {
+          // 有值但不匹配已知类型，保留原值
+          inputMethod = rawMethod;
+        }
+
         return {
           benGua,
           bianGua,
           dongYao: guaResult.changingLine || 1,
-          timestamp: new Date().toISOString(),
-          inputMethod: guaResult.method || '未知'
+          timestamp: createdAt.toISOString(),  // ✅ 使用真实记录时间
+          inputMethod  // ✅ 智能转换为中文
         };
       }
     }
@@ -128,8 +145,8 @@ export class HistoryService {
     return {
       records: records.map(r => {
         const rawResultData = r.getResultData();
-        // 兼容旧格式：自动转换为前端 DTO 格式
-        const normalizedResultData = this.normalizeResultData(rawResultData, r.type);
+        // 兼容旧格式：自动转换为前端 DTO 格式，传入真实记录时间
+        const normalizedResultData = this.normalizeResultData(rawResultData, r.type, r.createdAt);
 
         return {
           id: r.id,
@@ -162,8 +179,8 @@ export class HistoryService {
     }
 
     const rawResultData = record.getResultData();
-    // 兼容旧格式：自动转换为前端 DTO 格式
-    const normalizedResultData = this.normalizeResultData(rawResultData, record.type);
+    // 兼容旧格式：自动转换为前端 DTO 格式，传入真实记录时间
+    const normalizedResultData = this.normalizeResultData(rawResultData, record.type, record.createdAt);
 
     return {
       id: record.id,
